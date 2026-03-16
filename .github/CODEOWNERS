@@ -1,0 +1,15 @@
+# CODEOWNERS - Define code ownership for automatic review requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything
+* @ginanjarfm
+
+# Documentation
+/docs/ @ginanjarfm
+*.md @ginanjarfm
+
+# CI/CD configuration
+/.github/ @ginanjarfm
+
+# Infrastructure
+/infra/ @ginanjarfm
