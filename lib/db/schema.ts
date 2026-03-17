@@ -125,6 +125,13 @@ export const subscriptions = pgTable("subscriptions", {
     .$onUpdate(() => new Date()),
 });
 
+// Waitlist (pre-launch email capture)
+export const waitlist = pgTable("waitlist", {
+  id: uuid().defaultRandom().primaryKey(),
+  email: varchar({ length: 255 }).notNull().unique(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
