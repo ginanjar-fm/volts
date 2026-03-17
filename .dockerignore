@@ -1,0 +1,32 @@
+node_modules
+.next
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+README.md
+LICENSE
+.prettierignore
+.eslintcache
