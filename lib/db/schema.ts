@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 // Enums
+export const systemRoleEnum = pgEnum("system_role", ["user", "admin"]);
 export const roleEnum = pgEnum("role", ["owner", "admin", "member"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "active",
@@ -30,11 +31,25 @@ export const users = pgTable("users", {
   image: text(),
   passwordHash: text("password_hash"),
   emailVerified: timestamp("email_verified", { mode: "date" }),
+  systemRole: systemRoleEnum("system_role").notNull().default("user"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
+});
+
+// Audit log for admin actions
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid().defaultRandom().primaryKey(),
+  actorId: uuid("actor_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  action: varchar({ length: 128 }).notNull(),
+  targetType: varchar("target_type", { length: 64 }).notNull(),
+  targetId: varchar("target_id", { length: 255 }).notNull(),
+  metadata: text(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 // OAuth / credential accounts linked to users
@@ -185,6 +200,14 @@ export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   organizationMembers: many(organizationMembers),
   aiUsage: many(aiUsage),
+  auditLogs: many(auditLogs),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  actor: one(users, {
+    fields: [auditLogs.actorId],
+    references: [users.id],
+  }),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({

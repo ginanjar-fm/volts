@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Zap, Settings, CreditCard, Users } from "lucide-react";
+import { Zap, Settings, CreditCard, Users, Shield } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { useUser } from "@/hooks/use-user";
+import { useSession } from "next-auth/react";
 
 export function DashboardNav() {
   const { user } = useUser();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.systemRole === "admin";
 
   return (
     <nav className="border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -44,6 +47,15 @@ export function DashboardNav() {
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Settings</span>
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-400 transition-colors hover:text-red-300"
+            >
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">Admin</span>
+            </Link>
+          )}
           <ThemeToggle />
           {user && (
             <span className="ml-2 text-xs text-muted-foreground">

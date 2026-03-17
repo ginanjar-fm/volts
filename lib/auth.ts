@@ -62,15 +62,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
+      }
+      // Fetch systemRole on sign-in or refresh
+      if (token.id && (trigger === "signIn" || !token.systemRole)) {
+        const [dbUser] = await db
+          .select({ systemRole: users.systemRole })
+          .from(users)
+          .where(eq(users.id, token.id as string))
+          .limit(1);
+        token.systemRole = dbUser?.systemRole ?? "user";
       }
       return token;
     },
     async session({ session, token }) {
       if (token.id) {
         session.user.id = token.id as string;
+      }
+      if (token.systemRole) {
+        session.user.systemRole = token.systemRole as string;
       }
       return session;
     },
