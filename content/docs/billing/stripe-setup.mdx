@@ -1,0 +1,93 @@
+---
+title: Stripe Setup
+description: Configure Stripe API keys, initialize the client, and define subscription plans.
+---
+
+## Environment Variables
+
+Add these to your `.env.local`:
+
+```bash
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+Get your keys from the [Stripe Dashboard](https://dashboard.stripe.com/apikeys). Use test mode keys during development.
+
+## Stripe Client
+
+The Stripe client is initialized in `lib/stripe.ts`:
+
+```ts title="lib/stripe.ts"
+import Stripe from "stripe";
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia",
+  typescript: true,
+});
+```
+
+Import `stripe` anywhere you need to interact with the Stripe API.
+
+## Plans Configuration
+
+Plans are defined in a single config object:
+
+```ts title="lib/stripe.ts"
+export const PLANS = {
+  starter: {
+    name: "Starter",
+    price: 14900, // cents
+    priceId: process.env.STRIPE_STARTER_PRICE_ID!,
+    features: [
+      "Up to 1,000 API requests/mo",
+      "Basic analytics",
+      "Email support",
+      "1 team member",
+    ],
+  },
+  pro: {
+    name: "Pro",
+    price: 24900,
+    priceId: process.env.STRIPE_PRO_PRICE_ID!,
+    features: [
+      "Up to 10,000 API requests/mo",
+      "Advanced analytics",
+      "Priority support",
+      "5 team members",
+    ],
+  },
+  team: {
+    name: "Team",
+    price: 34900,
+    priceId: process.env.STRIPE_TEAM_PRICE_ID!,
+    features: [
+      "Unlimited API requests",
+      "Custom analytics",
+      "Dedicated support",
+      "Unlimited team members",
+    ],
+  },
+} as const;
+
+export type PlanId = keyof typeof PLANS;
+```
+
+Prices are stored in **cents** to avoid floating-point issues. The `priceId` maps to Stripe Price objects you create in the dashboard.
+
+## Creating Products in Stripe Dashboard
+
+1. Go to **Products** in the [Stripe Dashboard](https://dashboard.stripe.com/products)
+2. Click **Add product** for each plan
+3. Set the name, description, and recurring price
+4. Copy each Price ID (starts with `price_`)
+5. Add them to your `.env.local`:
+
+```bash
+STRIPE_STARTER_PRICE_ID=price_...
+STRIPE_PRO_PRICE_ID=price_...
+STRIPE_TEAM_PRICE_ID=price_...
+```
+
+Make sure the prices in Stripe match the `price` values in your `PLANS` config.

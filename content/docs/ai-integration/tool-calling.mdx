@@ -1,0 +1,140 @@
+---
+title: Tool Calling
+description: Let AI models execute functions using tool definitions with Zod schemas and multi-step iteration.
+---
+
+## Overview
+
+Tool calling lets the model invoke functions during generation. You define tools with typed input schemas — the model decides when and how to call them based on the conversation context.
+
+## Defining Tools
+
+Use `tool()` from the AI SDK with `z` (Zod) for input validation:
+
+```ts
+import { tool } from "ai";
+import { z } from "zod";
+
+const weatherTool = tool({
+  description: "Get current weather for a location",
+  parameters: z.object({
+    city: z.string().describe("City name"),
+    unit: z.enum(["celsius", "fahrenheit"]).default("celsius"),
+  }),
+  execute: async ({ city, unit }) => {
+    // Call your weather API
+    const data = await fetchWeather(city, unit);
+    return { temperature: data.temp, condition: data.condition };
+  },
+});
+
+const calculateTool = tool({
+  description: "Evaluate a math expression",
+  parameters: z.object({
+    expression: z.string().describe("Math expression to evaluate"),
+  }),
+  execute: async ({ expression }) => {
+    const result = eval(expression); // Use a safe math parser in production
+    return { result };
+  },
+});
+```
+
+The `description` tells the model what the tool does. The `parameters` schema defines what inputs the model must provide. The `execute` function runs when the tool is called.
+
+## Tools API Route
+
+The tools endpoint at `/api/ai/tools` uses `streamText()` with tool definitions:
+
+```ts title="app/api/ai/tools/route.ts"
+import { streamText, tool, stepCountIs } from "ai";
+import { z } from "zod";
+import { getModel } from "@/lib/ai/providers";
+
+export const maxDuration = 60;
+
+export async function POST(req: Request) {
+  const { messages, modelId } = await req.json();
+
+  const result = streamText({
+    model: getModel(modelId),
+    messages,
+    tools: {
+      getWeather: tool({
+        description: "Get current weather for a location",
+        parameters: z.object({
+          city: z.string().describe("City name"),
+          unit: z.enum(["celsius", "fahrenheit"]).default("celsius"),
+        }),
+        execute: async ({ city, unit }) => {
+          const data = await fetchWeather(city, unit);
+          return { temperature: data.temp, condition: data.condition };
+        },
+      }),
+      calculate: tool({
+        description: "Evaluate a math expression",
+        parameters: z.object({
+          expression: z.string().describe("Math expression to evaluate"),
+        }),
+        execute: async ({ expression }) => {
+          return { result: safeEval(expression) };
+        },
+      }),
+    },
+    stopWhen: stepCountIs(5),
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+`stopWhen: stepCountIs(5)` caps tool execution at 5 iterations. Without this, a model could loop indefinitely if tools keep returning results that trigger more calls.
+
+## Adding Custom Tools
+
+1. Define the tool with a clear description and typed parameters:
+
+```ts
+const searchDocsTool = tool({
+  description: "Search the knowledge base for relevant documents",
+  parameters: z.object({
+    query: z.string().describe("Search query"),
+    limit: z.number().default(5).describe("Max results to return"),
+  }),
+  execute: async ({ query, limit }) => {
+    const results = await db.document.findMany({
+      where: {
+        content: { search: query },
+      },
+      take: limit,
+      select: { title: true, snippet: true },
+    });
+    return { results };
+  },
+});
+```
+
+2. Add it to the `tools` object in your route:
+
+```ts
+const result = streamText({
+  model: getModel(modelId),
+  messages,
+  tools: {
+    getWeather: weatherTool,
+    calculate: calculateTool,
+    searchDocs: searchDocsTool, // New tool
+  },
+  stopWhen: stepCountIs(5),
+});
+```
+
+That's it. The model automatically discovers and uses tools based on their descriptions and the user's request.
+
+## Tips
+
+- **Write clear descriptions** — the model uses them to decide when to call a tool
+- **Keep schemas minimal** — only require inputs the tool actually needs
+- **Set sensible defaults** with `.default()` in Zod schemas
+- **Limit iterations** with `stopWhen: stepCountIs(n)` to prevent runaway loops
+- **Return structured data** — the model uses tool results to formulate its response

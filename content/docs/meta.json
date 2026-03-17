@@ -1,0 +1,16 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "---Getting Started---",
+    "getting-started",
+    "---Core Features---",
+    "authentication",
+    "database",
+    "billing",
+    "multi-tenancy",
+    "---AI---",
+    "ai-integration",
+    "---Deploy---",
+    "deployment"
+  ]
+}

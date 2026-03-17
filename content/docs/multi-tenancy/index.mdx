@@ -1,0 +1,52 @@
+---
+title: Multi-Tenancy
+description: Organization-based multi-tenancy with scoped data access and context switching.
+---
+
+## Overview
+
+Volts implements organization-based multi-tenancy. Every user can belong to multiple organizations, and all data is scoped to the active organization context.
+
+## How It Works
+
+1. **Users belong to organizations** through memberships with assigned roles
+2. **Active organization** is stored in a cookie (`volts-org-id`)
+3. **Data access** is scoped to the current organization in all queries
+4. **Context switching** lets users move between organizations without re-authenticating
+
+## Architecture
+
+```
+User
+ ├── Membership (org: Acme, role: owner)
+ ├── Membership (org: Initech, role: member)
+ └── Membership (org: Globex, role: admin)
+```
+
+When a user accesses the app, the `volts-org-id` cookie determines which organization's data they see. All API routes and server components read this cookie to scope queries.
+
+## Key Modules
+
+| Module | Purpose |
+| --- | --- |
+| [Organizations](/docs/multi-tenancy/organizations) | CRUD operations and context management |
+| [Roles & Permissions](/docs/multi-tenancy/roles) | Role-based access control within orgs |
+| [Invitations](/docs/multi-tenancy/invitations) | Invite flow for adding members |
+
+## Scoped Data Access
+
+Always filter queries by the current organization:
+
+```ts
+import { getCurrentOrgId } from "@/lib/org-context";
+import { eq } from "drizzle-orm";
+
+const orgId = await getCurrentOrgId();
+
+const projects = await db
+  .select()
+  .from(projects)
+  .where(eq(projects.orgId, orgId));
+```
+
+This pattern ensures tenants never see each other's data.

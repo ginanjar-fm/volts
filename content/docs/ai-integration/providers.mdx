@@ -1,0 +1,96 @@
+---
+title: Provider Setup
+description: Configure AI providers, register models, and add new providers to the Vercel AI SDK integration.
+---
+
+## Environment Variables
+
+```bash
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+The Vercel AI SDK reads these automatically — no extra config needed.
+
+## Provider Configuration
+
+Providers and models are registered in `lib/ai/providers.ts`:
+
+```ts title="lib/ai/providers.ts"
+import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+
+export const models = {
+  "gpt-4o": openai("gpt-4o"),
+  "gpt-4o-mini": openai("gpt-4o-mini"),
+  "claude-sonnet-4-5-20250514": anthropic("claude-sonnet-4-5-20250514"),
+  "claude-3-5-haiku-20241022": anthropic("claude-3-5-haiku-20241022"),
+} as const;
+
+export type ModelId = keyof typeof models;
+
+export const DEFAULT_MODEL: ModelId = "gpt-4o";
+```
+
+Each entry uses the provider's constructor function (`openai()` or `anthropic()`) to create a model instance that the AI SDK can use for generation.
+
+## Getting a Model
+
+Use the `getModel()` helper to resolve a model by ID with a fallback:
+
+```ts title="lib/ai/providers.ts"
+export function getModel(modelId?: string) {
+  if (modelId && modelId in models) {
+    return models[modelId as ModelId];
+  }
+  return models[DEFAULT_MODEL];
+}
+```
+
+Usage in an API route:
+
+```ts
+import { getModel } from "@/lib/ai/providers";
+
+const model = getModel(req.body.modelId); // Falls back to DEFAULT_MODEL
+```
+
+## Adding a New Provider
+
+1. Install the provider package:
+
+```bash
+pnpm add @ai-sdk/google
+```
+
+2. Register models in `lib/ai/providers.ts`:
+
+```ts
+import { google } from "@ai-sdk/google";
+
+export const models = {
+  // ... existing models
+  "gemini-2.0-flash": google("gemini-2.0-flash"),
+} as const;
+```
+
+3. Add the API key to `.env.local`:
+
+```bash
+GOOGLE_GENERATIVE_AI_API_KEY=...
+```
+
+The Vercel AI SDK supports [many providers](https://sdk.vercel.ai/providers) — Mistral, Cohere, Amazon Bedrock, and more. The pattern is always the same: install the package, import the constructor, and add it to the `models` map.
+
+## Adding a New Model
+
+To add another model from an existing provider, just add a new entry:
+
+```ts
+export const models = {
+  // ... existing models
+  "gpt-4-turbo": openai("gpt-4-turbo"),
+} as const;
+```
+
+No other changes needed — `getModel()` will resolve it automatically.

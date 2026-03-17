@@ -1,0 +1,51 @@
+---
+title: Authentication
+description: Auth.js (NextAuth v5) integration with JWT sessions, DrizzleAdapter, and multiple provider support.
+---
+
+Volts uses [Auth.js](https://authjs.dev/) (NextAuth v5) for authentication, configured with a JWT session strategy and DrizzleAdapter for database persistence.
+
+## How It Works
+
+Auth.js handles the entire authentication lifecycle: sign-in, sign-out, session management, and token refresh. The setup lives in `lib/auth.ts` and uses DrizzleAdapter to sync auth state with your PostgreSQL database.
+
+```ts title="lib/auth.ts"
+import NextAuth from "next-auth";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { db } from "@/lib/db";
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: DrizzleAdapter(db),
+  session: { strategy: "jwt" },
+  providers: [
+    // ...
+  ],
+});
+```
+
+## Session Strategy
+
+JWT sessions are used instead of database sessions. This means:
+
+- Sessions are stored in an encrypted cookie, not in the database
+- No database lookup on every request
+- Session data is available immediately via `auth()`
+
+## Provider Types
+
+Volts supports three types of authentication providers:
+
+| Type | Example | Use Case |
+| --- | --- | --- |
+| **OAuth** | GitHub, Google | Social login, SSO |
+| **Credentials** | Email + password | Traditional login |
+| **Magic Link** | Email-based | Passwordless login |
+
+Each provider type is configured in `lib/auth.ts`. See [Providers Setup](/docs/authentication/providers) for details on configuring each one.
+
+## Key Files
+
+- `lib/auth.ts` - Auth.js configuration and providers
+- `lib/auth-guard.ts` - Route protection utilities
+- `app/api/auth/[...nextauth]/route.ts` - Auth.js API route handler
+- `app/auth/signin/page.tsx` - Custom sign-in page

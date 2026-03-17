@@ -1,0 +1,80 @@
+---
+title: Roles & Permissions
+description: Role-based access control with owner, admin, and member roles within organizations.
+---
+
+## Roles
+
+Each organization membership has one of three roles:
+
+| Role | Description |
+| --- | --- |
+| `owner` | Full control. Can delete the org, manage billing, and do everything admins can. |
+| `admin` | Can manage members, invites, and org settings. |
+| `member` | Can access org data and resources. Cannot manage members or settings. |
+
+## Getting the Org Context
+
+Use `requireOrgContext()` in API routes and server actions to get the authenticated user's organization context:
+
+```ts
+import { requireOrgContext } from "@/lib/org-context";
+
+export async function POST(req: Request) {
+  const { orgId, role, userId } = await requireOrgContext();
+
+  // Now you have the org ID, the user's role, and their user ID
+}
+```
+
+This function throws a `401` if the user is not authenticated and a `403` if they don't belong to the current organization.
+
+## Checking Roles
+
+Gate actions by role:
+
+```ts
+import { requireOrgContext } from "@/lib/org-context";
+
+export async function DELETE(req: Request) {
+  const { orgId, role } = await requireOrgContext();
+
+  if (role !== "owner" && role !== "admin") {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  // Proceed with deletion
+}
+```
+
+### Helper Pattern
+
+For reusable checks, create a guard:
+
+```ts
+function requireRole(role: string, allowed: string[]) {
+  if (!allowed.includes(role)) {
+    throw new Response("Forbidden", { status: 403 });
+  }
+}
+
+// Usage
+const ctx = await requireOrgContext();
+requireRole(ctx.role, ["owner", "admin"]);
+```
+
+## Role Hierarchy
+
+When checking permissions, consider the hierarchy:
+
+```
+owner > admin > member
+```
+
+An `owner` can do everything an `admin` can, and an `admin` can do everything a `member` can. Structure your checks to allow higher roles implicitly:
+
+```ts
+const canManageMembers = role === "owner" || role === "admin";
+const canDeleteOrg = role === "owner";
+const canAccessData = true; // All roles
+```

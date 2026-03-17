@@ -1,0 +1,203 @@
+---
+title: Quick Start
+description: Build your first feature in Volts - add a dashboard page, make authenticated API calls, and use the AI chat component.
+---
+
+This guide assumes you have completed the [Installation](/docs/getting-started/installation) steps and have the dev server running.
+
+## Add a new dashboard page
+
+Create a new page inside the dashboard layout. All files under `app/(dashboard)` are automatically protected by authentication.
+
+```tsx title="app/(dashboard)/dashboard/analytics/page.tsx"
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+export default async function AnalyticsPage() {
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect("/sign-in");
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Analytics</h1>
+      <p className="text-muted-foreground">
+        Welcome back, {session.user.name}.
+      </p>
+      {/* Your analytics content here */}
+    </div>
+  );
+}
+```
+
+The page is now accessible at `/dashboard/analytics`. The dashboard layout handles the sidebar, header, and session management.
+
+## Make an authenticated API call
+
+### Create the API route
+
+```tsx title="app/api/analytics/route.ts"
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const session = await auth();
+
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Query your database with Drizzle
+  const data = await db.query.users.findFirst({
+    where: (users, { eq }) => eq(users.id, session.user.id),
+  });
+
+  return NextResponse.json({ data });
+}
+```
+
+### Call it from a client component
+
+```tsx title="components/analytics-widget.tsx"
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export function AnalyticsWidget() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/analytics")
+      .then((res) => res.json())
+      .then(setData);
+  }, []);
+
+  if (!data) return <div>Loading...</div>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your Profile</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <pre className="text-sm">{JSON.stringify(data, null, 2)}</pre>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+Then use it in your page:
+
+```tsx title="app/(dashboard)/dashboard/analytics/page.tsx"
+import { AnalyticsWidget } from "@/components/analytics-widget";
+
+export default function AnalyticsPage() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Analytics</h1>
+      <AnalyticsWidget />
+    </div>
+  );
+}
+```
+
+## Use the AI chat component
+
+Volts includes an AI chat interface powered by the Vercel AI SDK. You can embed it in any page.
+
+### Create a chat API route
+
+```tsx title="app/api/chat/route.ts"
+import { auth } from "@/lib/auth";
+import { openai } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
+export async function POST(req: Request) {
+  const session = await auth();
+
+  if (!session?.user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const { messages } = await req.json();
+
+  const result = streamText({
+    model: openai("gpt-4o"),
+    system: "You are a helpful assistant.",
+    messages,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+### Add the chat to a page
+
+```tsx title="components/ai-chat.tsx"
+"use client";
+
+import { useChat } from "@ai-sdk/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export function AIChat() {
+  const { messages, input, handleInputChange, handleSubmit, isLoading } =
+    useChat({ api: "/api/chat" });
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="space-y-4 overflow-y-auto max-h-[400px]">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={
+              message.role === "user"
+                ? "bg-primary/10 rounded-lg p-3 ml-auto max-w-[80%]"
+                : "bg-muted rounded-lg p-3 mr-auto max-w-[80%]"
+            }
+          >
+            <p className="text-sm">{message.content}</p>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <Input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Ask something..."
+        />
+        <Button type="submit" disabled={isLoading}>
+          Send
+        </Button>
+      </form>
+    </div>
+  );
+}
+```
+
+Use it on any dashboard page:
+
+```tsx
+import { AIChat } from "@/components/ai-chat";
+
+export default function ChatPage() {
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <h1 className="text-3xl font-bold">AI Assistant</h1>
+      <AIChat />
+    </div>
+  );
+}
+```
+
+## Next steps
+
+- Read the [Project Structure](/docs/getting-started/project-structure) to understand how the codebase is organized
+- Customize the Stripe billing plans in `lib/stripe.ts`
+- Add your own database tables in `lib/db/schema.ts` and run `npm run db:push`

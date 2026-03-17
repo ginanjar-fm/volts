@@ -1,0 +1,121 @@
+---
+title: Custom Auth Flows
+description: Custom signup endpoint, sign-in page, and JWT callback extensions for system roles.
+---
+
+Volts extends the default Auth.js flows with a custom signup endpoint, branded sign-in page, and extended JWT callbacks.
+
+## Signup Endpoint
+
+The signup endpoint at `/api/auth/signup` handles new user registration with email and password.
+
+```ts title="app/api/auth/signup/route.ts"
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import bcrypt from "bcryptjs";
+
+export async function POST(req: Request) {
+  const { email, password } = await req.json();
+
+  // Validate input
+  if (!email || !password || password.length < 8) {
+    return new Response("Email and password (min 8 chars) required", {
+      status: 400,
+    });
+  }
+
+  // Check for existing user
+  const existing = await db.query.users.findFirst({
+    where: eq(users.email, email),
+  });
+
+  if (existing) {
+    return new Response("User already exists", { status: 409 });
+  }
+
+  // Hash password and create user
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  const [user] = await db
+    .insert(users)
+    .values({ email, password: hashedPassword })
+    .returning();
+
+  return Response.json({ id: user.id, email: user.email });
+}
+```
+
+**Validation rules:**
+- Email is required
+- Password minimum length: 8 characters
+- Passwords are hashed with bcrypt (cost factor 12)
+
+## Custom Sign-In Page
+
+The custom sign-in page lives at `app/auth/signin/page.tsx` and is registered in the Auth.js config:
+
+```ts title="lib/auth.ts"
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  // ...
+  pages: {
+    signIn: "/auth/signin",
+  },
+});
+```
+
+This replaces the default Auth.js sign-in page with your own branded UI.
+
+## JWT Callbacks
+
+The JWT callbacks extend the token and session with a `systemRole` field, enabling role-based access control.
+
+```ts title="lib/auth.ts"
+callbacks: {
+  async jwt({ token, user }) {
+    if (user) {
+      token.id = user.id;
+      token.systemRole = user.systemRole; // "user" | "admin"
+    }
+    return token;
+  },
+  async session({ session, token }) {
+    if (token) {
+      session.user.id = token.id as string;
+      session.user.systemRole = token.systemRole as string;
+    }
+    return session;
+  },
+},
+```
+
+The `systemRole` is loaded from the database when the user first signs in and persisted in the JWT for subsequent requests.
+
+## Extending the Session Type
+
+To get TypeScript support for custom session fields, extend the Auth.js types:
+
+```ts title="types/next-auth.d.ts"
+import { DefaultSession } from "next-auth";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      systemRole: string;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    systemRole?: string;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string;
+    systemRole: string;
+  }
+}
+```
+
+This gives you type-safe access to `session.user.systemRole` across your application.

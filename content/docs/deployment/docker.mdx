@@ -1,0 +1,107 @@
+---
+title: Docker / Self-Hosted
+description: Deploy Volts with Docker for self-hosted environments.
+---
+
+## Dockerfile
+
+Create a multi-stage Dockerfile in your project root:
+
+```dockerfile
+FROM node:20-alpine AS base
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000
+CMD ["node", "server.js"]
+```
+
+## Docker Compose
+
+For a full stack with PostgreSQL:
+
+```yaml
+version: "3.8"
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: volts
+      POSTGRES_USER: volts
+      POSTGRES_PASSWORD: changeme
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://volts:changeme@db:5432/volts
+      AUTH_SECRET: your-secret-here
+      AUTH_URL: https://your-domain.com
+      STRIPE_SECRET_KEY: sk_live_...
+      STRIPE_PUBLISHABLE_KEY: pk_live_...
+      STRIPE_WEBHOOK_SECRET: whsec_...
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
+```
+
+## Next.js Standalone Output
+
+Add `output: "standalone"` to your Next.js config for Docker builds:
+
+```ts
+// next.config.ts
+const nextConfig: NextConfig = {
+  output: "standalone",
+};
+```
+
+## Running Migrations
+
+Run migrations after the database is ready:
+
+```bash
+docker compose exec app npx tsx lib/db/migrate.ts
+```
+
+## Coolify / Self-Hosted Platforms
+
+Volts works with any Docker-compatible platform:
+
+1. Push your repo to GitHub
+2. Connect the repo in your platform (Coolify, CapRover, etc.)
+3. Set environment variables
+4. Deploy — the Dockerfile handles the build
+
+Set `AUTH_URL` to your actual domain for OAuth callbacks to work.

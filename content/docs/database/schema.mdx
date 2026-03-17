@@ -1,0 +1,168 @@
+---
+title: Schema Overview
+description: Complete database schema with all tables, enums, and relations defined in Drizzle ORM.
+---
+
+The full schema is defined in `lib/db/schema.ts` using Drizzle's `pgTable` helper.
+
+## Enums
+
+```ts title="lib/db/schema.ts"
+import { pgEnum } from "drizzle-orm/pg-core";
+
+export const systemRoleEnum = pgEnum("system_role", ["user", "admin"]);
+export const roleEnum = pgEnum("role", ["owner", "admin", "member"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "active",
+  "canceled",
+  "past_due",
+  "trialing",
+  "incomplete",
+]);
+```
+
+## Tables
+
+### Auth Tables
+
+```ts
+export const users = pgTable("users", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").unique().notNull(),
+  emailVerified: timestamp("email_verified", { mode: "date" }),
+  image: text("image"),
+  password: text("password"),
+  systemRole: systemRoleEnum("system_role").default("user").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const accounts = pgTable("accounts", {
+  // OAuth account links (provider, providerAccountId, etc.)
+});
+
+export const sessions = pgTable("sessions", {
+  // Session records for database strategy (unused with JWT)
+});
+
+export const verificationTokens = pgTable("verification_tokens", {
+  // Email verification and magic link tokens
+});
+```
+
+### Organization Tables
+
+```ts
+export const organizations = pgTable("organizations", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  slug: text("slug").unique().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const organizationMembers = pgTable("organization_members", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text("organization_id").references(() => organizations.id).notNull(),
+  userId: text("user_id").references(() => users.id).notNull(),
+  role: roleEnum("role").default("member").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const organizationInvites = pgTable("organization_invites", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text("organization_id").references(() => organizations.id).notNull(),
+  email: text("email").notNull(),
+  role: roleEnum("role").default("member").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+```
+
+### Billing & Usage Tables
+
+```ts
+export const subscriptions = pgTable("subscriptions", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").references(() => organizations.id).notNull(),
+  status: subscriptionStatusEnum("status").notNull(),
+  priceId: text("price_id"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const aiUsage = pgTable("ai_usage", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text("organization_id").references(() => organizations.id).notNull(),
+  userId: text("user_id").references(() => users.id).notNull(),
+  model: text("model").notNull(),
+  tokensUsed: integer("tokens_used").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+```
+
+### System Tables
+
+```ts
+export const auditLogs = pgTable("audit_logs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationId: text("organization_id").references(() => organizations.id),
+  userId: text("user_id").references(() => users.id),
+  action: text("action").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const waitlist = pgTable("waitlist", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email: text("email").unique().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+```
+
+## Relations
+
+Drizzle relations are defined alongside the schema to enable the relational query API:
+
+```ts
+import { relations } from "drizzle-orm";
+
+export const usersRelations = relations(users, ({ many }) => ({
+  accounts: many(accounts),
+  memberships: many(organizationMembers),
+  aiUsage: many(aiUsage),
+}));
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  members: many(organizationMembers),
+  invites: many(organizationInvites),
+  subscriptions: many(subscriptions),
+  auditLogs: many(auditLogs),
+}));
+
+export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organizationMembers.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [organizationMembers.userId],
+    references: [users.id],
+  }),
+}));
+```
+
+This lets you write queries with nested includes:
+
+```ts
+const org = await db.query.organizations.findFirst({
+  where: eq(organizations.slug, "my-org"),
+  with: {
+    members: { with: { user: true } },
+    subscriptions: true,
+  },
+});
+```

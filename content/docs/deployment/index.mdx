@@ -1,0 +1,64 @@
+---
+title: Deployment
+description: Deploy Volts to production with environment configuration and platform-specific guides.
+---
+
+## Overview
+
+Volts is a Next.js application that can be deployed to any platform supporting Node.js. The recommended platforms are [Vercel](/docs/deployment/vercel) and [Railway](/docs/deployment/railway).
+
+## Build
+
+```bash
+npm run build
+```
+
+This runs `next build` and outputs the production bundle.
+
+## Environment Variables Checklist
+
+Set all required variables in your production environment before deploying:
+
+### Core
+
+| Variable | Description |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `AUTH_SECRET` | Random string for session encryption (`openssl rand -base64 32`) |
+| `AUTH_URL` | Your production URL (e.g. `https://app.example.com`) |
+
+### Authentication Providers
+
+| Variable | Description |
+| --- | --- |
+| `AUTH_GOOGLE_ID` | Google OAuth client ID |
+| `AUTH_GOOGLE_SECRET` | Google OAuth client secret |
+| `AUTH_GITHUB_ID` | GitHub OAuth app ID |
+| `AUTH_GITHUB_SECRET` | GitHub OAuth app secret |
+
+### Payments
+
+| Variable | Description |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
+
+### AI
+
+| Variable | Description |
+| --- | --- |
+| `OPENAI_API_KEY` | OpenAI API key |
+
+## Database Migration
+
+Run migrations against your production database before the first deploy:
+
+```bash
+npx drizzle-kit push
+```
+
+## Platform Guides
+
+- [Vercel](/docs/deployment/vercel) - Recommended for most use cases
+- [Railway](/docs/deployment/railway) - Good for all-in-one hosting with managed PostgreSQL

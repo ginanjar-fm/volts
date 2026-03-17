@@ -1,0 +1,37 @@
+---
+title: AI Integration
+description: Built-in AI capabilities using the Vercel AI SDK with OpenAI and Anthropic provider support.
+---
+
+Volts ships with AI integration powered by the [Vercel AI SDK](https://sdk.vercel.ai). Two providers are configured out of the box — OpenAI and Anthropic — with streaming, completions, and tool calling ready to use.
+
+## Available Models
+
+| Model | Provider | Best For |
+|-------|----------|----------|
+| **GPT-4o** | OpenAI | Complex reasoning, general-purpose tasks |
+| **GPT-4o Mini** | OpenAI | Fast responses, cost-efficient |
+| **Claude Sonnet 4.5** | Anthropic | Nuanced analysis, long-form content |
+| **Claude Haiku 3.5** | Anthropic | Quick tasks, high throughput |
+
+Switch between models by passing a `modelId` to any endpoint.
+
+## API Endpoints
+
+### Chat (Streaming)
+
+`POST /api/ai/chat` — Streams responses token-by-token using Server-Sent Events. Ideal for conversational UIs.
+
+### Completion (Non-Streaming)
+
+`POST /api/ai/completion` — Returns a full response in a single JSON payload. Use for background tasks or when streaming isn't needed.
+
+### Tools
+
+`POST /api/ai/tools` — Enables the model to call defined tools (functions) during generation. Supports multi-step tool execution with automatic iteration.
+
+## Next Steps
+
+- [Provider Setup](/docs/ai-integration/providers) — Configure API keys and add models
+- [Streaming](/docs/ai-integration/streaming) — Build real-time chat interfaces
+- [Tool Calling](/docs/ai-integration/tool-calling) — Let models execute functions

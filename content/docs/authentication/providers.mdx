@@ -1,0 +1,88 @@
+---
+title: Providers Setup
+description: Configure GitHub, Google OAuth, and email/password authentication providers.
+---
+
+All providers are configured in `lib/auth.ts`. Add or remove providers by editing the `providers` array.
+
+## GitHub OAuth
+
+1. Create an OAuth App at [github.com/settings/developers](https://github.com/settings/developers)
+2. Set the callback URL to `http://localhost:3000/api/auth/callback/github` (update for production)
+3. Add environment variables:
+
+```bash title=".env.local"
+AUTH_GITHUB_ID=your_client_id
+AUTH_GITHUB_SECRET=your_client_secret
+```
+
+## Google OAuth
+
+1. Create credentials in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Set the callback URL to `http://localhost:3000/api/auth/callback/google`
+3. Add environment variables:
+
+```bash title=".env.local"
+AUTH_GOOGLE_ID=your_client_id
+AUTH_GOOGLE_SECRET=your_client_secret
+```
+
+## Email / Password (Credentials)
+
+The credentials provider uses bcrypt with a cost factor of 12 for password hashing.
+
+```ts title="lib/auth.ts"
+import Credentials from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+
+Credentials({
+  credentials: {
+    email: { type: "email" },
+    password: { type: "password" },
+  },
+  async authorize(credentials) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, credentials.email as string),
+    });
+
+    if (!user || !user.password) return null;
+
+    const valid = await bcrypt.compare(
+      credentials.password as string,
+      user.password
+    );
+
+    return valid ? user : null;
+  },
+})
+```
+
+## Full Providers Config
+
+```ts title="lib/auth.ts"
+import GitHub from "next-auth/providers/github";
+import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: DrizzleAdapter(db),
+  session: { strategy: "jwt" },
+  providers: [
+    GitHub({
+      clientId: process.env.AUTH_GITHUB_ID,
+      clientSecret: process.env.AUTH_GITHUB_SECRET,
+    }),
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+    }),
+    Credentials({
+      // ... authorize function
+    }),
+  ],
+});
+```
+
+<Callout type="info">
+  Callback URLs follow the pattern `/api/auth/callback/[provider]`. Update these when deploying to production.
+</Callout>

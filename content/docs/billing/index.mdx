@@ -1,0 +1,46 @@
+---
+title: Billing
+description: Stripe-powered billing with subscription plans, checkout sessions, customer portal, and webhook handling.
+---
+
+Volts integrates [Stripe](https://stripe.com) for billing and subscription management. Everything is wired up out of the box — plans, checkout, portal access, and webhook processing.
+
+## Plans
+
+Three subscription tiers ship by default:
+
+| Plan | Price | Target |
+|------|-------|--------|
+| **Starter** | $149/mo | Solo founders and small projects |
+| **Pro** | $249/mo | Growing teams with advanced needs |
+| **Team** | $349/mo | Organizations needing collaboration features |
+
+Plans are configured in a single `PLANS` object — change prices, features, or add new tiers without touching Stripe directly.
+
+## Core Features
+
+### Checkout Sessions
+
+Stripe Checkout handles payment collection. When a user picks a plan, a checkout session is created server-side and the user is redirected to Stripe's hosted payment page.
+
+```
+User clicks "Subscribe" → API creates checkout session → Redirect to Stripe → Payment → Webhook confirms → DB updated
+```
+
+### Customer Portal
+
+Subscribers manage their billing through Stripe's customer portal — update payment methods, switch plans, cancel, and view invoices. No custom UI needed.
+
+### Webhooks
+
+A webhook endpoint processes Stripe events in real time:
+
+- **`checkout.session.completed`** — Activates the subscription after payment
+- **`customer.subscription.updated`** — Syncs plan changes and status
+- **`customer.subscription.deleted`** — Handles cancellations
+
+## Next Steps
+
+- [Stripe Setup](/docs/billing/stripe-setup) — Configure API keys and plans
+- [Subscription Management](/docs/billing/subscriptions) — Checkout, portal, and status tracking
+- [Webhooks](/docs/billing/webhooks) — Event handling and local testing

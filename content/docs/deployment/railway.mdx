@@ -1,0 +1,77 @@
+---
+title: Railway
+description: Deploy Volts to Railway with managed PostgreSQL and automatic builds.
+---
+
+## Setup
+
+### 1. Create a Project
+
+1. Go to [railway.app/new](https://railway.app/new)
+2. Select **Deploy from GitHub repo**
+3. Connect your repository
+
+### 2. Add PostgreSQL
+
+1. In your Railway project, click **New → Database → PostgreSQL**
+2. Railway provisions a PostgreSQL instance and sets `DATABASE_URL` automatically in your service's variables
+
+No manual database URL configuration needed.
+
+### 3. Set Environment Variables
+
+In your service's **Variables** tab, add the remaining variables:
+
+```
+AUTH_SECRET=your-random-secret
+AUTH_URL=https://your-app.up.railway.app
+AUTH_GOOGLE_ID=...
+AUTH_GOOGLE_SECRET=...
+AUTH_GITHUB_ID=...
+AUTH_GITHUB_SECRET=...
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+OPENAI_API_KEY=sk-...
+```
+
+`DATABASE_URL` is already provided by the linked PostgreSQL service -- do not override it.
+
+### 4. Deploy
+
+Railway builds and deploys on every push to your default branch. The build command (`npm run build`) and start command (`npm start`) are detected automatically from `package.json`.
+
+## Database Migration
+
+Run migrations against the Railway database using the Railway CLI:
+
+```bash
+railway run npx drizzle-kit push
+```
+
+Or connect directly using the `DATABASE_URL` from the Railway dashboard.
+
+## Custom Domain
+
+1. Go to your service's **Settings → Networking → Custom Domain**
+2. Add your domain
+3. Configure DNS with the CNAME record Railway provides
+4. Update `AUTH_URL` to your custom domain
+
+Railway provides a default domain at `*.up.railway.app` for immediate use.
+
+## Stripe Webhook
+
+Set up a webhook in the [Stripe Dashboard](https://dashboard.stripe.com/webhooks) pointing to:
+
+```
+https://your-app.up.railway.app/api/webhooks/stripe
+```
+
+Copy the signing secret to `STRIPE_WEBHOOK_SECRET` in Railway's variables.
+
+## Notes
+
+- Railway charges based on resource usage (CPU, memory, network)
+- Use Railway's **Reference Variables** to share `DATABASE_URL` between services: `${{Postgres.DATABASE_URL}}`
+- Logs are available in real-time from the service's **Deployments** tab

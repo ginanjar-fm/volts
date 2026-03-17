@@ -1,0 +1,148 @@
+---
+title: Subscription Management
+description: Handle checkout sessions, customer portal access, subscription status tracking, and the billing dashboard.
+---
+
+## Checkout Session
+
+Create a checkout session to start a subscription. The API endpoint handles session creation and returns a redirect URL.
+
+```ts title="app/api/stripe/checkout/route.ts"
+import { stripe, PLANS } from "@/lib/stripe";
+import { auth } from "@/lib/auth";
+import { NextResponse } from "next/server";
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { planId } = await req.json();
+  const plan = PLANS[planId as keyof typeof PLANS];
+
+  const checkoutSession = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    payment_method_types: ["card"],
+    line_items: [{ price: plan.priceId, quantity: 1 }],
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?canceled=true`,
+    customer_email: session.user.email!,
+    metadata: { userId: session.user.id },
+  });
+
+  return NextResponse.json({ url: checkoutSession.url });
+}
+```
+
+On the client, redirect the user after creating the session:
+
+```ts
+const res = await fetch("/api/stripe/checkout", {
+  method: "POST",
+  body: JSON.stringify({ planId: "pro" }),
+});
+const { url } = await res.json();
+window.location.href = url;
+```
+
+## Customer Portal
+
+Let subscribers manage their billing through Stripe's hosted portal:
+
+```ts title="app/api/stripe/portal/route.ts"
+import { stripe } from "@/lib/stripe";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { NextResponse } from "next/server";
+
+export async function POST() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { stripeCustomerId: true },
+  });
+
+  const portalSession = await stripe.billingPortal.sessions.create({
+    customer: user!.stripeCustomerId!,
+    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing`,
+  });
+
+  return NextResponse.json({ url: portalSession.url });
+}
+```
+
+## Subscription Status
+
+Subscription status is stored in the database and kept in sync via webhooks. The possible values:
+
+| Status | Meaning |
+|--------|---------|
+| `active` | Payment confirmed, subscription is live |
+| `trialing` | In free trial period |
+| `past_due` | Payment failed, retrying |
+| `canceled` | Subscription canceled (may still be active until period end) |
+| `incomplete` | Initial payment pending |
+| `paused` | Subscription paused by billing logic |
+
+Check subscription status in your app:
+
+```ts
+import { db } from "@/lib/db";
+
+async function hasActiveSubscription(userId: string): Promise<boolean> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { subscriptionStatus: true },
+  });
+  return user?.subscriptionStatus === "active" || user?.subscriptionStatus === "trialing";
+}
+```
+
+## Billing Page
+
+The billing dashboard lives at `/dashboard/billing` and shows:
+
+- Current plan and status
+- Plan comparison with upgrade/downgrade options
+- Portal link for payment management
+
+```tsx title="app/dashboard/billing/page.tsx"
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { PLANS } from "@/lib/stripe";
+import { PlanCard } from "./plan-card";
+import { PortalButton } from "./portal-button";
+
+export default async function BillingPage() {
+  const session = await auth();
+  const user = await db.user.findUnique({
+    where: { id: session!.user!.id },
+    select: { subscriptionStatus: true, planId: true },
+  });
+
+  return (
+    <div>
+      <h1>Billing</h1>
+      <p>Status: {user?.subscriptionStatus ?? "No subscription"}</p>
+
+      <div className="grid grid-cols-3 gap-4">
+        {Object.entries(PLANS).map(([id, plan]) => (
+          <PlanCard
+            key={id}
+            planId={id}
+            plan={plan}
+            isCurrent={user?.planId === id}
+          />
+        ))}
+      </div>
+
+      {user?.subscriptionStatus === "active" && <PortalButton />}
+    </div>
+  );
+}
+```

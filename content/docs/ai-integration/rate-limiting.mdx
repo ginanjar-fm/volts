@@ -1,0 +1,88 @@
+---
+title: Rate Limiting
+description: Per-user AI rate limiting with sliding window enforcement and monthly plan-based quotas.
+---
+
+## Overview
+
+Volts uses an in-memory sliding window rate limiter per user, backed by persistent usage tracking in the database. Limits are enforced per billing plan.
+
+## Plan Limits
+
+| Plan    | Monthly AI Requests |
+| ------- | ------------------- |
+| Starter | 5,000               |
+| Pro     | 50,000              |
+| Team    | Unlimited           |
+
+## Checking Rate Limits
+
+The `checkRateLimit` function in `lib/ai/rate-limit.ts` validates whether a user can make an AI request:
+
+```ts
+import { checkRateLimit } from "@/lib/ai/rate-limit";
+
+const { allowed, remaining, resetAt } = await checkRateLimit(userId, tier);
+
+if (!allowed) {
+  return new Response("Rate limit exceeded", {
+    status: 429,
+    headers: {
+      "X-RateLimit-Remaining": String(remaining),
+      "X-RateLimit-Reset": resetAt.toISOString(),
+    },
+  });
+}
+```
+
+### Return Value
+
+```ts
+type RateLimitResult = {
+  allowed: boolean;    // Whether the request is permitted
+  remaining: number;   // Requests left in the current period
+  resetAt: Date;       // When the limit resets (start of next month)
+};
+```
+
+## Usage Tracking
+
+After a successful AI request, track consumption with `trackUsage()` from `lib/ai/usage.ts`. This writes to the `aiUsage` table:
+
+```ts
+import { trackUsage } from "@/lib/ai/usage";
+
+await trackUsage({
+  userId,
+  model: "gpt-4o",
+  inputTokens: 500,
+  outputTokens: 200,
+});
+```
+
+## Querying Usage Stats
+
+Use `getUsageForPeriod()` to retrieve aggregated usage for dashboards or billing:
+
+```ts
+import { getUsageForPeriod } from "@/lib/ai/usage";
+
+const usage = await getUsageForPeriod(userId, {
+  start: new Date("2026-03-01"),
+  end: new Date("2026-03-31"),
+});
+
+// usage.totalRequests
+// usage.totalInputTokens
+// usage.totalOutputTokens
+```
+
+## How the Sliding Window Works
+
+The rate limiter maintains an in-memory map of recent request timestamps per user. When `checkRateLimit` is called, it:
+
+1. Prunes timestamps outside the current billing period
+2. Counts remaining requests against the plan limit
+3. Returns the result without a database round-trip for fast enforcement
+
+Database-backed usage in `aiUsage` serves as the persistent source of truth and is reconciled on server restart.

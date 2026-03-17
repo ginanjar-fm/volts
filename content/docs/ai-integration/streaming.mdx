@@ -1,0 +1,117 @@
+---
+title: Streaming
+description: Build real-time chat interfaces with streaming responses using the Vercel AI SDK.
+---
+
+## Chat API Route
+
+The chat endpoint uses `streamText()` to stream tokens as they're generated:
+
+```ts title="app/api/ai/chat/route.ts"
+import { streamText } from "ai";
+import { getModel } from "@/lib/ai/providers";
+
+export const maxDuration = 60; // Required for Vercel serverless
+
+export async function POST(req: Request) {
+  const { messages, modelId } = await req.json();
+
+  const result = streamText({
+    model: getModel(modelId),
+    messages,
+    system: "You are a helpful assistant.",
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+`streamText()` generates the response incrementally. `toUIMessageStreamResponse()` converts it into a streaming HTTP response compatible with the AI SDK's client-side hooks.
+
+The `maxDuration = 60` export tells Vercel to allow up to 60 seconds for the function — necessary since streaming responses can take longer than the default 10-second timeout.
+
+## Client-Side Usage
+
+Use the `useChat()` hook from `@ai-sdk/react` to connect a React component to the streaming endpoint:
+
+```tsx title="components/chat.tsx"
+"use client";
+
+import { useChat } from "@ai-sdk/react";
+
+export function Chat() {
+  const { messages, input, handleInputChange, handleSubmit, isLoading } =
+    useChat({
+      api: "/api/ai/chat",
+      body: { modelId: "gpt-4o" },
+    });
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex-1 space-y-4">
+        {messages.map((message) => (
+          <div key={message.id} className="flex gap-2">
+            <span className="font-bold">
+              {message.role === "user" ? "You" : "AI"}:
+            </span>
+            <p>{message.content}</p>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Type a message..."
+          className="flex-1 rounded border px-3 py-2"
+          disabled={isLoading}
+        />
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="rounded bg-black px-4 py-2 text-white"
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+```
+
+`useChat()` manages the full conversation lifecycle — message history, input state, submission, and real-time streaming updates. Messages appear token-by-token as they arrive.
+
+## Key `useChat()` Options
+
+```ts
+useChat({
+  api: "/api/ai/chat",           // Endpoint URL
+  body: { modelId: "gpt-4o" },   // Extra body params sent with every request
+  initialMessages: [],            // Pre-populate conversation history
+  onFinish: (message) => {},      // Callback when streaming completes
+  onError: (error) => {},         // Error handler
+});
+```
+
+## Completion (Non-Streaming)
+
+For cases where you need a complete response at once:
+
+```ts title="app/api/ai/completion/route.ts"
+import { generateText } from "ai";
+import { getModel } from "@/lib/ai/providers";
+
+export async function POST(req: Request) {
+  const { prompt, modelId } = await req.json();
+
+  const { text } = await generateText({
+    model: getModel(modelId),
+    prompt,
+  });
+
+  return Response.json({ text });
+}
+```
+
+Use `generateText()` instead of `streamText()` when streaming isn't necessary — background jobs, batch processing, or API responses that need the full text before proceeding.

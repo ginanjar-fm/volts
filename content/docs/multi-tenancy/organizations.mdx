@@ -1,0 +1,80 @@
+---
+title: Organizations
+description: Create, manage, and switch between organizations with cookie-based context tracking.
+---
+
+## API Endpoints
+
+All organization CRUD is available at `/api/organizations`:
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/organizations` | List user's organizations |
+| `POST` | `/api/organizations` | Create a new organization |
+| `PATCH` | `/api/organizations/[id]` | Update organization |
+| `DELETE` | `/api/organizations/[id]` | Delete organization (owner only) |
+
+### Create an Organization
+
+```ts
+const res = await fetch("/api/organizations", {
+  method: "POST",
+  body: JSON.stringify({ name: "Acme Corp" }),
+});
+const org = await res.json();
+```
+
+### List Organizations
+
+```ts
+const res = await fetch("/api/organizations");
+const orgs = await res.json();
+```
+
+## Organization Context
+
+The active organization is tracked via a cookie. Use the helpers from `lib/org-context.ts`:
+
+### Get Current Organization
+
+```ts
+import { getCurrentOrgId } from "@/lib/org-context";
+
+const orgId = await getCurrentOrgId();
+```
+
+### Set Current Organization
+
+```ts
+import { setCurrentOrgId } from "@/lib/org-context";
+
+await setCurrentOrgId(orgId);
+```
+
+### Cookie Configuration
+
+The `volts-org-id` cookie is set with:
+
+- **httpOnly**: `true`
+- **secure**: `true` in production
+- **sameSite**: `lax`
+- **maxAge**: 365 days
+
+## Organization Switcher
+
+The organization switcher component lets users change their active organization from the UI. It calls `setCurrentOrgId()` on selection and reloads the current page to reflect the new context.
+
+```tsx
+import { OrgSwitcher } from "@/components/org-switcher";
+
+export default function Sidebar() {
+  return (
+    <nav>
+      <OrgSwitcher />
+      {/* ... */}
+    </nav>
+  );
+}
+```
+
+The switcher displays the current organization name, lists all organizations the user belongs to, and includes a link to create a new organization.

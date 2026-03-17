@@ -1,0 +1,61 @@
+---
+title: Database
+description: PostgreSQL database setup with Drizzle ORM and postgres-js driver.
+---
+
+Volts uses PostgreSQL as its database with [Drizzle ORM](https://orm.drizzle.team/) for type-safe queries and schema management.
+
+## Connection Setup
+
+The database connection is configured in `lib/db/index.ts` using Drizzle with the postgres-js driver:
+
+```ts title="lib/db/index.ts"
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
+
+const client = postgres(process.env.DATABASE_URL!);
+
+export const db = drizzle(client, { schema });
+```
+
+## Environment Variable
+
+Set `DATABASE_URL` in your `.env.local`:
+
+```bash title=".env.local"
+DATABASE_URL=postgresql://user:password@localhost:5432/volts
+```
+
+For production, use a connection string from your database provider (Neon, Supabase, Railway, etc.).
+
+## Usage
+
+Import `db` anywhere in your server-side code:
+
+```ts
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+// Query
+const user = await db.query.users.findFirst({
+  where: eq(users.email, "user@example.com"),
+});
+
+// Insert
+const [newUser] = await db.insert(users).values({ email, password }).returning();
+
+// Update
+await db.update(users).set({ name: "New Name" }).where(eq(users.id, userId));
+
+// Delete
+await db.delete(users).where(eq(users.id, userId));
+```
+
+## Key Files
+
+- `lib/db/index.ts` - Database connection and Drizzle instance
+- `lib/db/schema.ts` - All table and relation definitions
+- `drizzle.config.ts` - Drizzle Kit configuration
+- `drizzle/` - Generated migration files

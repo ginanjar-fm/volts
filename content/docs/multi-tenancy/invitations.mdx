@@ -1,0 +1,81 @@
+---
+title: Invitations
+description: Invite users to organizations with token-based acceptance and role assignment.
+---
+
+## Invite Flow
+
+1. Admin or owner creates an invite with an assigned role
+2. A unique token is generated and sent to the invitee
+3. Invitee visits `/invite/[token]` to accept
+4. On acceptance, a membership is created in the organization
+
+## API Endpoints
+
+### Create an Invite
+
+```
+POST /api/organizations/[id]/invites
+```
+
+```ts
+const res = await fetch(`/api/organizations/${orgId}/invites`, {
+  method: "POST",
+  body: JSON.stringify({
+    email: "newuser@example.com",
+    role: "member", // "member" | "admin"
+  }),
+});
+const invite = await res.json();
+// invite.token - share this with the invitee
+```
+
+Only `owner` and `admin` roles can create invites. Owners can invite admins; admins can only invite members.
+
+### List Pending Invites
+
+```
+GET /api/organizations/[id]/invites
+```
+
+```ts
+const res = await fetch(`/api/organizations/${orgId}/invites`);
+const invites = await res.json();
+```
+
+### Accept an Invite
+
+```
+POST /api/invites/[token]
+```
+
+```ts
+const res = await fetch(`/api/invites/${token}`, {
+  method: "POST",
+});
+```
+
+The accepting user must be authenticated. On success, they are added to the organization with the role specified in the invite.
+
+## Invite Properties
+
+| Field | Description |
+| --- | --- |
+| `email` | Email address of the invitee |
+| `role` | Role to assign on acceptance |
+| `token` | Unique acceptance token |
+| `expiresAt` | Expiration timestamp |
+| `invitedBy` | User ID of the inviter |
+| `orgId` | Target organization |
+
+## Expiry
+
+Invites expire after a set period. Expired tokens return a `410 Gone` response when used. Admins can revoke pending invites by deleting them:
+
+```
+DELETE /api/organizations/[id]/invites/[inviteId]
+```
+
+## Accept Page
+
+The `/invite/[token]` page validates the token and shows the organization name and assigned role. If the user is not signed in, they are redirected to sign in first, then back to the invite page.

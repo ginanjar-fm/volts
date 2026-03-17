@@ -1,0 +1,103 @@
+---
+title: Protected Routes
+description: Guard server components, API routes, and organization-scoped pages with authentication checks.
+---
+
+Volts provides utility functions to protect routes at the server level. No client-side guards needed.
+
+## Server Components
+
+Use `requireAuth()` from `lib/auth-guard.ts` to protect any server component. It returns the session or redirects to `/auth/signin`.
+
+```tsx title="app/dashboard/page.tsx"
+import { requireAuth } from "@/lib/auth-guard";
+
+export default async function DashboardPage() {
+  const session = await requireAuth();
+
+  return <h1>Welcome, {session.user.name}</h1>;
+}
+```
+
+If the user is not authenticated, they are automatically redirected to `/auth/signin`. No manual checks needed.
+
+## API Routes
+
+For API routes, use `auth()` directly and return a 401 response for unauthenticated requests:
+
+```ts title="app/api/data/route.ts"
+import { auth } from "@/lib/auth";
+
+export async function GET() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  // Authenticated - proceed with request
+  const userId = session.user.id;
+  // ...
+}
+```
+
+## Organization Context Guard
+
+For pages that require an active organization, use `requireOrgContext()` from `lib/org-context.ts`. This ensures the user both is authenticated and has selected an organization.
+
+```tsx title="app/[orgSlug]/settings/page.tsx"
+import { requireOrgContext } from "@/lib/org-context";
+
+export default async function OrgSettingsPage({
+  params,
+}: {
+  params: { orgSlug: string };
+}) {
+  const { session, organization, membership } = await requireOrgContext(
+    params.orgSlug
+  );
+
+  return (
+    <div>
+      <h1>{organization.name} Settings</h1>
+      <p>Your role: {membership.role}</p>
+    </div>
+  );
+}
+```
+
+`requireOrgContext()` returns:
+
+| Field | Description |
+| --- | --- |
+| `session` | The authenticated user session |
+| `organization` | The resolved organization record |
+| `membership` | The user's membership and role in the organization |
+
+If the user is not a member of the organization or the org doesn't exist, they are redirected.
+
+## Combining Guards
+
+For API routes that need both auth and org context:
+
+```ts title="app/api/[orgSlug]/members/route.ts"
+import { auth } from "@/lib/auth";
+import { getOrgContext } from "@/lib/org-context";
+
+export async function GET(
+  req: Request,
+  { params }: { params: { orgSlug: string } }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const orgContext = await getOrgContext(session.user.id, params.orgSlug);
+  if (!orgContext) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  // Proceed with org-scoped logic
+}
+```

@@ -1,0 +1,146 @@
+---
+title: Queries
+description: Type-safe database query patterns using Drizzle ORM with PostgreSQL.
+---
+
+## Overview
+
+Volts uses [Drizzle ORM](https://orm.drizzle.team) for type-safe database access. All queries are fully typed from your schema definitions.
+
+## Basic Operations
+
+### Select
+
+```ts
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+// Select all
+const allUsers = await db.select().from(users);
+
+// Select with condition
+const user = await db
+  .select()
+  .from(users)
+  .where(eq(users.id, userId))
+  .limit(1);
+```
+
+### Insert
+
+```ts
+import { db } from "@/lib/db";
+import { projects } from "@/lib/db/schema";
+
+const [project] = await db
+  .insert(projects)
+  .values({
+    name: "My Project",
+    orgId: organizationId,
+  })
+  .returning();
+```
+
+### Update
+
+```ts
+import { db } from "@/lib/db";
+import { projects } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+await db
+  .update(projects)
+  .set({ name: "Renamed Project" })
+  .where(eq(projects.id, projectId));
+```
+
+### Delete
+
+```ts
+import { db } from "@/lib/db";
+import { projects } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+await db.delete(projects).where(eq(projects.id, projectId));
+```
+
+## WHERE Clauses
+
+Drizzle provides composable filter functions:
+
+```ts
+import { eq, and, or, gt, like } from "drizzle-orm";
+
+// Single condition
+db.select().from(users).where(eq(users.email, "a@b.com"));
+
+// AND
+db.select().from(users).where(
+  and(
+    eq(users.orgId, orgId),
+    eq(users.role, "admin")
+  )
+);
+
+// OR
+db.select().from(users).where(
+  or(
+    eq(users.role, "owner"),
+    eq(users.role, "admin")
+  )
+);
+
+// Combined
+db.select().from(projects).where(
+  and(
+    eq(projects.orgId, orgId),
+    or(
+      like(projects.name, "%search%"),
+      gt(projects.createdAt, since)
+    )
+  )
+);
+```
+
+## Relations Queries
+
+Drizzle's relational query API provides a cleaner syntax for fetching related data:
+
+```ts
+// Find one
+const user = await db.query.users.findFirst({
+  where: eq(users.id, userId),
+  with: {
+    memberships: true,
+  },
+});
+
+// Find many
+const orgMembers = await db.query.memberships.findMany({
+  where: eq(memberships.orgId, orgId),
+  with: {
+    user: true,
+  },
+  orderBy: (memberships, { desc }) => [desc(memberships.createdAt)],
+  limit: 50,
+});
+```
+
+## Type-Safe Schema Inference
+
+Derive TypeScript types directly from your schema:
+
+```ts
+import { InferSelectModel, InferInsertModel } from "drizzle-orm";
+import { users } from "@/lib/db/schema";
+
+type User = InferSelectModel<typeof users>;
+type NewUser = InferInsertModel<typeof users>;
+
+// Use in functions
+async function createUser(data: NewUser): Promise<User> {
+  const [user] = await db.insert(users).values(data).returning();
+  return user;
+}
+```

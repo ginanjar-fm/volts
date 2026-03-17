@@ -1,0 +1,4 @@
+{
+  "title": "Multi-Tenancy",
+  "pages": ["index", "organizations", "roles", "invitations"]
+}

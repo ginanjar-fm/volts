@@ -1,0 +1,129 @@
+---
+title: Installation
+description: Set up Volts AI SaaS Starter Kit from scratch with Next.js 16, PostgreSQL, and all required services.
+---
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- **Node.js 20+** - [Download](https://nodejs.org/)
+- **PostgreSQL** - Running locally or a hosted instance (Neon, Supabase, etc.)
+- **npm** - Comes with Node.js
+
+## Clone and install
+
+```bash
+git clone https://github.com/your-org/volts.git
+cd volts
+npm install
+```
+
+## Configure environment variables
+
+Copy the example env file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and configure each variable:
+
+```bash
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/volts
+
+# Auth.js
+AUTH_SECRET= # Generate with: npx auth secret
+AUTH_URL=http://localhost:3000
+
+# GitHub OAuth (https://github.com/settings/developers)
+AUTH_GITHUB_ID=
+AUTH_GITHUB_SECRET=
+
+# Google OAuth (https://console.cloud.google.com/apis/credentials)
+AUTH_GOOGLE_ID=
+AUTH_GOOGLE_SECRET=
+
+# Stripe (https://dashboard.stripe.com/apikeys)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+### Generate Auth.js secret
+
+```bash
+npx auth secret
+```
+
+Copy the output into `AUTH_SECRET`.
+
+### Set up OAuth providers
+
+**GitHub:** Go to [GitHub Developer Settings](https://github.com/settings/developers), create a new OAuth App. Set the callback URL to `http://localhost:3000/api/auth/callback/github`.
+
+**Google:** Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create OAuth 2.0 credentials. Set the redirect URI to `http://localhost:3000/api/auth/callback/google`.
+
+### Set up Stripe
+
+1. Get your API keys from the [Stripe Dashboard](https://dashboard.stripe.com/apikeys)
+2. For the webhook secret, install the Stripe CLI and run:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+The CLI prints the webhook signing secret on startup.
+
+## Set up the database
+
+Push the schema to your database and seed it with initial data:
+
+```bash
+npm run db:push
+npm run db:seed
+```
+
+If you prefer running migrations instead:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+To inspect your database visually:
+
+```bash
+npm run db:studio
+```
+
+## Start the dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). You should see the Volts landing page.
+
+## Verify the setup
+
+1. Click **Sign In** and authenticate with GitHub or Google
+2. You should land on the dashboard at `/dashboard`
+3. Check the terminal for any errors related to missing env vars
+
+## Available scripts
+
+| Script | Description |
+| --- | --- |
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Format code with Prettier |
+| `npm run format:check` | Check formatting without writing |
+| `npm run db:generate` | Generate Drizzle migrations |
+| `npm run db:migrate` | Run pending migrations |
+| `npm run db:push` | Push schema directly to database |
+| `npm run db:studio` | Open Drizzle Studio |
+| `npm run db:seed` | Seed database with initial data |

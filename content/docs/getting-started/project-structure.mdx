@@ -1,0 +1,146 @@
+---
+title: Project Structure
+description: Understand how the Volts AI SaaS Starter Kit codebase is organized - directories, key files, and conventions.
+---
+
+## Directory layout
+
+```
+volts/
+├── app/                    # Next.js App Router
+│   ├── (auth)/             # Auth pages (sign-in, sign-up)
+│   ├── (dashboard)/        # Authenticated dashboard pages
+│   ├── (marketing)/        # Public marketing pages
+│   └── api/                # API route handlers
+│       ├── auth/           # Auth.js API routes
+│       ├── chat/           # AI chat endpoints
+│       ├── stripe/         # Stripe checkout and portal
+│       └── webhooks/       # Webhook handlers (Stripe, etc.)
+├── components/             # Reusable React components
+│   ├── ui/                 # shadcn/ui primitives
+│   ├── dashboard/          # Dashboard-specific components
+│   ├── marketing/          # Landing page components
+│   └── shared/             # Shared across layouts
+├── hooks/                  # Custom React hooks
+├── lib/                    # Business logic and configuration
+│   ├── auth.ts             # Auth.js configuration
+│   ├── db/                 # Drizzle ORM setup and schema
+│   │   ├── index.ts        # Database client
+│   │   └── schema.ts       # Table definitions
+│   ├── ai.ts               # Vercel AI SDK helpers
+│   ├── stripe.ts           # Stripe client and plan config
+│   └── utils.ts            # General utilities
+├── types/                  # TypeScript type definitions
+├── content/                # Documentation MDX files
+├── drizzle/                # Generated database migrations
+├── public/                 # Static assets (images, fonts)
+├── next.config.ts          # Next.js configuration
+├── drizzle.config.ts       # Drizzle ORM configuration
+├── source.config.ts        # Content source configuration
+├── tailwind.config.ts      # Tailwind CSS 4 configuration
+└── tsconfig.json           # TypeScript configuration
+```
+
+## Directories
+
+### `app/`
+
+Uses the Next.js 16 App Router with route groups for layout separation:
+
+- **`(auth)/`** - Sign-in and sign-up pages. These use a minimal layout without the dashboard sidebar.
+- **`(dashboard)/`** - All authenticated pages. The layout wraps pages with session checks, sidebar navigation, and the main header.
+- **`(marketing)/`** - Public-facing pages like the landing page, pricing, and blog. Uses its own layout with marketing header and footer.
+- **`api/`** - Server-side route handlers for authentication, AI, Stripe, and webhooks.
+
+### `components/`
+
+All React components live here, organized by scope:
+
+- **`ui/`** - Low-level primitives from shadcn/ui (Button, Card, Dialog, etc.). Managed via `npx shadcn@latest add`.
+- **`dashboard/`** - Components used only within the dashboard (charts, data tables, settings forms).
+- **`marketing/`** - Components for public pages (hero sections, feature grids, pricing cards).
+- **`shared/`** - Components used across multiple layouts (theme toggle, user avatar).
+
+### `hooks/`
+
+Custom React hooks for client-side logic:
+
+```tsx
+// Example: hooks/use-subscription.ts
+import { useEffect, useState } from "react";
+
+export function useSubscription() {
+  const [plan, setPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stripe/subscription")
+      .then((res) => res.json())
+      .then((data) => setPlan(data.plan));
+  }, []);
+
+  return { plan, isPro: plan === "pro" };
+}
+```
+
+### `lib/`
+
+Core business logic and third-party service configuration.
+
+| File | Purpose |
+| --- | --- |
+| `auth.ts` | Auth.js config with GitHub and Google providers |
+| `db/index.ts` | Drizzle client connected via `DATABASE_URL` |
+| `db/schema.ts` | All database table definitions (users, accounts, sessions, subscriptions) |
+| `ai.ts` | Vercel AI SDK model configuration and helpers |
+| `stripe.ts` | Stripe client initialization and plan/price definitions |
+| `utils.ts` | Shared utilities (`cn()` for class merging, formatters, etc.) |
+
+### `types/`
+
+Shared TypeScript type definitions that are used across the project. Keeps component props and API response types centralized.
+
+### `content/`
+
+MDX files for documentation pages. Processed via the content source defined in `source.config.ts`.
+
+### `drizzle/`
+
+Auto-generated SQL migration files. Created when you run `npm run db:generate`. Do not edit these manually.
+
+### `public/`
+
+Static files served at the root URL. Place images, favicons, and other assets here.
+
+## Key configuration files
+
+### `next.config.ts`
+
+Next.js 16 configuration. Includes settings for MDX content processing, image domains, and any server-external packages.
+
+### `drizzle.config.ts`
+
+Tells Drizzle where to find your schema and where to output migrations:
+
+```ts
+import { defineConfig } from "drizzle-kit";
+
+export default defineConfig({
+  schema: "./lib/db/schema.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+});
+```
+
+### `source.config.ts`
+
+Configures the content source for documentation. Maps the `content/` directory to routes and defines frontmatter fields.
+
+## Conventions
+
+- **Route groups** `(name)` separate layouts without affecting URL paths
+- **Server components** by default - add `"use client"` only when you need browser APIs or hooks
+- **Colocation** - page-specific components can live next to their page file, shared ones go in `components/`
+- **Database changes** - edit `lib/db/schema.ts`, then run `npm run db:push` (development) or `npm run db:generate && npm run db:migrate` (production)

@@ -1,0 +1,76 @@
+---
+title: Migrations
+description: Generate, apply, and manage database migrations with Drizzle Kit.
+---
+
+Volts uses [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) for schema migrations. Migration files are stored in the `drizzle/` directory.
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `npm run db:generate` | Generate migration files from schema changes |
+| `npm run db:migrate` | Apply pending migrations to the database |
+| `npm run db:push` | Push schema directly to the database (dev only) |
+| `npm run db:studio` | Open Drizzle Studio visual database browser |
+
+## Workflow
+
+### Making Schema Changes
+
+1. Edit your schema in `lib/db/schema.ts`
+2. Generate a migration:
+
+```bash
+npm run db:generate
+```
+
+This compares your schema file against the previous state and creates a new SQL migration in `drizzle/`.
+
+3. Apply the migration:
+
+```bash
+npm run db:migrate
+```
+
+### Development Shortcut
+
+During development, you can skip migration files and push schema changes directly:
+
+```bash
+npm run db:push
+```
+
+This is faster for rapid iteration but doesn't create migration files. Use `db:generate` + `db:migrate` for any changes you want to track and deploy.
+
+## Drizzle Studio
+
+Launch a visual database browser to inspect and edit data:
+
+```bash
+npm run db:studio
+```
+
+Opens at `https://local.drizzle.studio` in your browser.
+
+## Migration Files
+
+Generated migrations live in `drizzle/` and look like this:
+
+```
+drizzle/
+  0000_initial.sql
+  0001_add_organizations.sql
+  0002_add_subscriptions.sql
+  meta/
+    _journal.json
+    0000_snapshot.json
+    0001_snapshot.json
+    0002_snapshot.json
+```
+
+The `meta/` directory contains snapshots that Drizzle Kit uses to diff against your current schema. Do not edit these files manually.
+
+<Callout type="warn">
+  Always commit migration files to version control. They are the source of truth for your production database schema.
+</Callout>
