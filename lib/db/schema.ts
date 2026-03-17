@@ -8,6 +8,7 @@ import {
   boolean,
   integer,
   pgEnum,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // Enums
@@ -26,7 +27,8 @@ export const users = pgTable("users", {
   id: uuid().defaultRandom().primaryKey(),
   email: varchar({ length: 255 }).notNull().unique(),
   name: varchar({ length: 255 }),
-  avatar: text(),
+  image: text(),
+  passwordHash: text("password_hash"),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
@@ -36,34 +38,44 @@ export const users = pgTable("users", {
 });
 
 // OAuth / credential accounts linked to users
+// Property names must match Auth.js Drizzle adapter expectations
 export const accounts = pgTable("accounts", {
   id: uuid().defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  type: varchar({ length: 64 }).notNull(),
   provider: varchar({ length: 64 }).notNull(),
   providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  expiresAt: integer("expires_at"),
-  tokenType: varchar("token_type", { length: 64 }),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: varchar("token_type", { length: 64 }),
   scope: text(),
-  idToken: text("id_token"),
+  id_token: text("id_token"),
+  session_state: text("session_state"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-// Sessions
+// Sessions (for database session strategy, optional with JWT)
 export const sessions = pgTable("sessions", {
-  id: uuid().defaultRandom().primaryKey(),
+  sessionToken: text("session_token").primaryKey(),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  token: text().notNull().unique(),
-  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
-  ipAddress: varchar("ip_address", { length: 45 }),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  expires: timestamp({ mode: "date" }).notNull(),
 });
+
+// Verification tokens (magic link, email verification)
+export const verificationTokens = pgTable(
+  "verification_tokens",
+  {
+    identifier: varchar({ length: 255 }).notNull(),
+    token: text().notNull().unique(),
+    expires: timestamp({ mode: "date" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
+);
 
 // Organizations (teams / workspaces)
 export const organizations = pgTable("organizations", {
