@@ -103,6 +103,23 @@ export const organizationMembers = pgTable("organization_members", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// Organization invites
+export const organizationInvites = pgTable("organization_invites", {
+  id: uuid().defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  email: varchar({ length: 255 }).notNull(),
+  role: roleEnum().notNull().default("member"),
+  token: varchar({ length: 255 }).notNull().unique(),
+  invitedBy: uuid("invited_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  acceptedAt: timestamp("accepted_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Stripe subscriptions
 export const subscriptions = pgTable("subscriptions", {
   id: uuid().defaultRandom().primaryKey(),
@@ -125,6 +142,25 @@ export const subscriptions = pgTable("subscriptions", {
     .$onUpdate(() => new Date()),
 });
 
+// AI usage tracking
+export const aiUsage = pgTable("ai_usage", {
+  id: uuid().defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id").references(() => organizations.id, {
+    onDelete: "cascade",
+  }),
+  provider: varchar({ length: 64 }).notNull(), // openai, anthropic
+  model: varchar({ length: 128 }).notNull(),
+  promptTokens: integer("prompt_tokens").notNull().default(0),
+  completionTokens: integer("completion_tokens").notNull().default(0),
+  totalTokens: integer("total_tokens").notNull().default(0),
+  costCents: integer("cost_cents").notNull().default(0),
+  endpoint: varchar({ length: 128 }), // chat, completion, tool-call
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // Waitlist (pre-launch email capture)
 export const waitlist = pgTable("waitlist", {
   id: uuid().defaultRandom().primaryKey(),
@@ -133,10 +169,22 @@ export const waitlist = pgTable("waitlist", {
 });
 
 // Relations
+export const aiUsageRelations = relations(aiUsage, ({ one }) => ({
+  user: one(users, {
+    fields: [aiUsage.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [aiUsage.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   sessions: many(sessions),
   organizationMembers: many(organizationMembers),
+  aiUsage: many(aiUsage),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -156,6 +204,7 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   members: many(organizationMembers),
   subscriptions: many(subscriptions),
+  invites: many(organizationInvites),
 }));
 
 export const organizationMembersRelations = relations(
@@ -167,6 +216,20 @@ export const organizationMembersRelations = relations(
     }),
     user: one(users, {
       fields: [organizationMembers.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const organizationInvitesRelations = relations(
+  organizationInvites,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [organizationInvites.organizationId],
+      references: [organizations.id],
+    }),
+    inviter: one(users, {
+      fields: [organizationInvites.invitedBy],
       references: [users.id],
     }),
   }),
