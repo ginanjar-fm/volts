@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { stripe, PLANS, getBaseUrl, type PlanKey } from "@/lib/stripe";
+import { getStripe, PLANS, getBaseUrl, type PlanKey } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const baseUrl = getBaseUrl();
   const selectedPlan = PLANS[plan];
 
-  const checkoutSession = await stripe.checkout.sessions.create({
+  const checkoutSession = await getStripe().checkout.sessions.create({
     mode: "payment",
     customer_email: session.user.email,
     metadata: {
